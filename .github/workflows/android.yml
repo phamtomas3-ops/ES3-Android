@@ -1,24 +1,61 @@
-name: Android CI
+
+name: ES.3 Android Build
+
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 17 }
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
-        with: { gradle-version: 8.10.2 }
-      - name: Test
-        run: gradle test --stacktrace
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
-      - uses: actions/upload-artifact@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          name: es3-debug-apk
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Verify project files
+        run: |
+          test -f settings.gradle.kts || test -f settings.gradle
+          test -d app
+
+      - name: Run unit tests
+        run: gradle test
+
+      - name: Build debug APK
+        run: gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ES3-Android-debug
           path: app/build/outputs/apk/debug/*.apk
-# Release signing (Stage 8): decode keystore from GitHub Secrets; never commit keystores.
+          if-no-files-found: error
+          retention-days: 30
+concurrency:
